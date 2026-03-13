@@ -1,23 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../../core/api_constants.dart'; // 🔥 Apna sahi path daal lena
+import '../../core/api_constants.dart'; // 🔥 Path check kar lena
 import 'auth_service.dart';
 import 'login_model.dart';
 
-// --- STATES ---
+// ==========================================
+// 🏗️ 1. AUTH STATES
+// ==========================================
 abstract class AuthState {}
+
 class AuthInitial extends AuthState {}
+
 class AuthLoading extends AuthState {}
+
 class AuthOtpSent extends AuthState {
   final String email;
   AuthOtpSent(this.email);
 }
 
-// 🚀 THE FIX: UserModel ko optional (nullable) banaya.
-// Taaki server down hone par hum bina naye data ke bhi Home page khol sakein!
+// 🚀 THE INDUSTRY FIX: UserModel ko optional (nullable) rakha hai.
+// Taaki agar server down ho ya internet na ho, tab bhi session persisted rahe.
 class AuthVerified extends AuthState {
   final UserModel? user;
-  AuthVerified([this.user]); // Optional parameter
+  AuthVerified([this.user]);
 }
 
 class AuthError extends AuthState {
@@ -25,20 +30,24 @@ class AuthError extends AuthState {
   AuthError(this.errorMessage);
 }
 
-// --- PROVIDERS ---
+// ==========================================
+// 🛰️ 2. PROVIDERS
+// ==========================================
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
   return AuthController(ref.read(authServiceProvider));
 });
 
-// --- CONTROLLER ---
+// ==========================================
+// 🕹️ 3. CONTROLLER (StateNotifier)
+// ==========================================
 class AuthController extends StateNotifier<AuthState> {
   final AuthService _authService;
 
   AuthController(this._authService) : super(AuthInitial());
 
-  // 1. REGISTER
+  // --- A. REGISTER ---
   Future<void> register({required String fullName, required String email, required String phoneNumber}) async {
     state = AuthLoading();
     try {
@@ -50,7 +59,7 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  // 2. LOGIN
+  // --- B. LOGIN ---
   Future<void> login({required String email}) async {
     state = AuthLoading();
     try {
@@ -62,7 +71,7 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  // 3. VERIFY OTP
+  // --- C. VERIFY OTP ---
   Future<void> verifyOtp({required String email, required String otp}) async {
     state = AuthLoading();
     try {
@@ -76,56 +85,56 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  // 4. CHECK PERSISTENT SESSION (Called from Splash Screen)
+  // --- D. CHECK PERSISTENT SESSION ---
   Future<void> checkSession() async {
     try {
-      // 1. FAST LOCAL CHECK: Sabse pehle token check karo local storage se
       const storage = FlutterSecureStorage();
       final token = await storage.read(key: ApiConstants.accessTokenKey);
 
       if (token == null || token.isEmpty) {
         if (mounted) state = AuthInitial();
-        return; // Token nahi hai toh yahi se wapas Login pe bhej do
+        return;
       }
 
-      // 2. TOKEN HAI! Ab backend se fresh user data laane ki koshish karo
+      // Fresh data laane ki koshish karo
       final user = await _authService.getUserProfile();
-      if (mounted) {
-        state = AuthVerified(user); // Data aa gaya, Home pe bhej do
-      }
+      if (mounted) state = AuthVerified(user);
 
     } catch (e) {
       final errorMessage = e.toString();
-
-      // 🚀 THE INDUSTRY FIX: Check karo error kya hai?
-      if (errorMessage.contains('Session expired') || errorMessage.contains('No token')) {
-        // 🔥 SIRF TABHI LOGOUT KARO jab token sach mein expire ho (401 error)
+      // Sirf strictly 401 (Unauthorized) par logout karo
+      if (errorMessage.contains('Session expired')) {
         await _authService.logout();
-        if (mounted) {
-          state = AuthInitial();
-        }
+        if (mounted) state = AuthInitial();
       } else {
-        // 🔥 SERVER IS DOWN OR NO INTERNET!
-        // Token local storage me already hai, toh logout MAT karo.
-        // User ko Home page par bhej do bina nayi profile fetch kiye.
-        print("Background fetch failed (Server Down/No Internet): $errorMessage");
-        if (mounted) {
-          state = AuthVerified(); // Null user pass hoga, par Home page makhhan khul jayega!
-        }
+        // No Internet / Server issue: Allow Home Access with local session
+        if (mounted) state = AuthVerified();
       }
     }
   }
 
-  // 5. MANUAL LOGOUT
-  Future<void> logoutUser() async {
-    state = AuthLoading();
-    await _authService.logout();
-    if (mounted) {
-      state = AuthInitial(); // State reset, UI will redirect to Login
+  // ==========================================
+  // 📍 E. SYNC LIVE LOCATION (INDUSTRY LEVEL)
+  // ==========================================
+  Future<void> updateLiveLocation(double lat, double lng) async {
+    try {
+      // Direct call to hit PATCH /users/sync-location
+      await _authService.syncLocation(lat, lng);
+      print("✅ Background Sync: Location updated successfully ($lat, $lng)");
+    } catch (e) {
+      // Silent Error: User ko pareshaan nahi karenge
+      print("❌ Sync Warning: $e");
     }
   }
 
-  // 6. RESET STATE (For UI toggles)
+  // --- F. MANUAL LOGOUT ---
+  Future<void> logoutUser() async {
+    state = AuthLoading();
+    await _authService.logout();
+    if (mounted) state = AuthInitial();
+  }
+
+  // --- G. RESET STATE ---
   void resetToInitial() {
     state = AuthInitial();
   }
