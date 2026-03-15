@@ -97,20 +97,7 @@ class ProfileScreen extends ConsumerWidget {
                                       ? Center(child: Text(firstLetter, style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.deepOrange)))
                                       : null,
                                 ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))],
-                                    ),
-                                    child: const Icon(Icons.camera_alt_rounded, color: Colors.deepOrange, size: 16),
-                                  ),
-                                )
-                              ],
+                                  ],
                             ),
                           ),
                           const SizedBox(height: 12),

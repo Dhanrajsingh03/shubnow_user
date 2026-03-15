@@ -21,7 +21,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
-  String _currentLocationName = "Detecting location...";
+  String _currentLocationName = "Fetching precise location...";
   bool _isLocationLoading = false;
   late PageController _pageController;
   Timer? _timer;
@@ -42,7 +42,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   // ==========================================
-  // 📍 BULLETPROOF LOCATION LOGIC
+  // 📍 PRECISE LOCATION LOGIC
   // ==========================================
   Future<void> _initLocationSequence() async {
     if (!mounted) return;
@@ -63,13 +63,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
       }
 
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       ref.read(authControllerProvider.notifier).updateLiveLocation(position.latitude, position.longitude);
 
       List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
       if (placemarks.isNotEmpty && mounted) {
+        final place = placemarks[0];
+        String locality = place.subLocality?.isNotEmpty == true ? place.subLocality! : place.locality ?? "";
+        String city = place.locality ?? place.subAdministrativeArea ?? "";
+
         setState(() {
-          _currentLocationName = "${placemarks[0].locality}, ${placemarks[0].subAdministrativeArea}";
+          _currentLocationName = locality.isNotEmpty ? "$locality, $city" : city;
+          if (_currentLocationName.isEmpty) _currentLocationName = "Unknown Location";
           _isLocationLoading = false;
         });
       }
@@ -86,13 +91,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   // --- 📝 DATA CONFIG ---
+
   final List<Map<String, dynamic>> _featuredServices = [
     {'name': 'Free Muhurat\nConsultation', 'icon': Icons.access_time_filled, 'color': Colors.orange},
     {'name': 'Regular\nPuja', 'icon': Icons.temple_hindu, 'color': Colors.red},
     {'name': 'Wedding\nPooja', 'icon': Icons.diversity_1, 'color': Colors.pink},
-    {'name': 'Havan /\nAnushthan', 'icon': Icons.local_fire_department, 'color': Colors.deepOrange},
-    {'name': '99 Pooja\nSeva', 'icon': Icons.volunteer_activism, 'color': Colors.green},
-    {'name': 'Special\nVrat Kit', 'icon': Icons.card_giftcard, 'color': Colors.blue},
+    {'name': 'Havan &\nAnushthan', 'icon': Icons.local_fire_department, 'color': Colors.deepOrange},
   ];
 
   final List<Map<String, dynamic>> _subscriptionServices = [
@@ -130,36 +134,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
               _buildHeader(userName),
-              _buildSearchBar(),
+
+              // 🚀 STICKY & CLICKABLE SEARCH BAR
+              SliverPersistentHeader(
+                pinned: true,
+                floating: false,
+                delegate: _StickySearchBarDelegate(
+                  onSearchTap: () => context.pushNamed('search'),
+                ),
+              ),
+
               _buildBanner(),
 
-              // --- FEATURED ---
+              // --- 🚀 SECTION 1: FEATURED (2x2 GRID) ---
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Featured Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 20),
-                      Wrap(
-                        spacing: 12, runSpacing: 24,
-                        children: _featuredServices.map((s) => _buildIconService(context, s)).toList(),
+                      const Text('Featured Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87)),
+                      const SizedBox(height: 16),
+                      GridView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 2.5,
+                        ),
+                        itemCount: _featuredServices.length,
+                        itemBuilder: (context, index) {
+                          return _buildFeaturedGridCard(context, _featuredServices[index]);
+                        },
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // --- SUBSCRIPTIONS ---
+              // --- 📦 SECTION 2: SUBSCRIPTIONS ---
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Subscription Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 20),
+                      const Text('Subscription Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87)),
+                      const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
                         decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade100)),
@@ -173,11 +197,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              // --- UPCOMING FESTIVALS ---
+              // --- 🪔 SECTION 3: UPCOMING FESTIVALS ---
               _buildSectionTitleSliver("Upcoming Festival Pooja"),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 330, // Thodi height badhayi price include karne ke liye
+                  height: 330,
                   child: pujasState.when(
                     loading: () => _buildHorizontalShimmerBox(),
                     error: (e, _) => const Center(child: Text("Unable to load festivals")),
@@ -198,7 +222,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              // --- RECOMMENDED ---
+              // --- ⭐ SECTION 4: RECOMMENDED ---
               _buildSectionTitleSliver("Popular / Recommended Pooja"),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -228,45 +252,83 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   // ==========================================
-  // 🎨 PROFESSIONAL UI COMPONENTS WITH CLICKS
+  // 🎨 PROFESSIONAL UI COMPONENTS
   // ==========================================
 
-  Widget _buildIconService(BuildContext context, Map<String, dynamic> service) {
-    return SizedBox(
-      width: (MediaQuery.of(context).size.width - 40 - 24) / 3,
+  Widget _buildFeaturedGridCard(BuildContext context, Map<String, dynamic> service) {
+    Color serviceColor = service['color'] as Color;
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () {
           if (service['name'].contains('Regular')) context.pushNamed('regular-pujas');
           else if (service['name'].contains('Wedding')) context.pushNamed('wedding-pujas');
           else if (service['name'].contains('Havan')) context.pushNamed('hawan-pujas');
+          else ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Muhurat Consultation coming soon!")));
         },
-        child: Column(
-          children: [
-            Container(
-              height: 60, width: 60,
-              decoration: BoxDecoration(color: (service['color'] as Color).withOpacity(0.1), borderRadius: BorderRadius.circular(18)),
-              child: Icon(service['icon'] as IconData, color: service['color'] as Color, size: 28),
-            ),
-            const SizedBox(height: 10),
-            Text(service['name'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1.2)),
-          ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: serviceColor.withOpacity(0.06),
+            border: Border.all(color: serviceColor.withOpacity(0.15), width: 1.2),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: serviceColor.withOpacity(0.2), blurRadius: 6, offset: const Offset(0, 2))],
+                ),
+                child: Icon(service['icon'] as IconData, color: serviceColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  service['name'].toString().replaceAll('\n', ' '),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black87, height: 1.2),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // 🚀 FIXED: InkWell & Material for perfect clicks + Added Price
+  Widget _buildIconService(BuildContext context, Map<String, dynamic> service) {
+    return InkWell(
+      onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Subscription details coming soon!"))),
+      child: Column(
+        children: [
+          Container(
+            height: 60, width: 60,
+            decoration: BoxDecoration(color: (service['color'] as Color).withOpacity(0.1), borderRadius: BorderRadius.circular(18)),
+            child: Icon(service['icon'] as IconData, color: service['color'] as Color, size: 28),
+          ),
+          const SizedBox(height: 10),
+          Text(service['name'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1.2)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFestivalCard(PujaModel puja) {
     return Container(
       width: 260,
-      margin: const EdgeInsets.only(bottom: 8), // Shadow space
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 8))],
       ),
       child: Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        clipBehavior: Clip.antiAlias, // Ensures InkWell doesn't leak out of borders
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => context.pushNamed('puja-details', extra: puja),
           child: Container(
@@ -297,7 +359,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Text(puja.title, style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 16),
 
-                      // 💰 ADDED PRICE SECTION HERE
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -337,7 +398,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  // 🚀 FIXED: InkWell & Material for perfect clicks
   Widget _buildPopularCard(PujaModel puja) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -394,7 +454,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  // --- REUSABLE HELPERS ---
+  // --- REUSABLE HEADER & UTILS ---
 
   Widget _buildHeader(String name) => SliverToBoxAdapter(
     child: Padding(
@@ -424,29 +484,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ]
             ),
           ),
-          const CircleAvatar(backgroundColor: Colors.deepOrange, child: Icon(Icons.person, color: Colors.white)),
+          Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                child: const Icon(Icons.notifications_outlined, color: Colors.black87, size: 24),
+              ),
+              Positioned(
+                top: 8, right: 8,
+                child: Container(height: 8, width: 8, decoration: const BoxDecoration(color: Colors.deepOrange, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5)))),
+              )
+            ],
+          ),
         ],
-      ),
-    ),
-  );
-
-  Widget _buildSearchBar() => SliverToBoxAdapter(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Container(
-          height: 52,
-          decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
-          child: Row(
-              children: [
-                const SizedBox(width: 16),
-                const Icon(Icons.search, color: Colors.grey),
-                const SizedBox(width: 12),
-                const Expanded(child: Text("Search for Puja, Pandits...", style: TextStyle(color: Colors.grey, fontSize: 14))),
-                Container(height: 20, width: 1, color: Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 12)),
-                const Icon(Icons.mic, color: Colors.deepOrange, size: 22),
-                const SizedBox(width: 16),
-              ]
-          )
       ),
     ),
   );
@@ -493,7 +544,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87)),
-            const Text("View All", style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 12)),
           ],
         )
     ),
@@ -541,4 +591,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildVerticalShimmerBox() => Column(
       children: List.generate(3, (_) => Shimmer.fromColors(baseColor: Colors.grey.shade200, highlightColor: Colors.white, child: Container(height: 110, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)))))
   );
+}
+
+// ==========================================
+// 🚀 THE MAGIC: STICKY SEARCH BAR DELEGATE
+// ==========================================
+class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
+  final VoidCallback onSearchTap;
+
+  _StickySearchBarDelegate({required this.onSearchTap});
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final bool isPinned = shrinkOffset > 0 || overlapsContent;
+
+    return Container(
+      color: Colors.white,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: isPinned
+              ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))]
+              : [],
+        ),
+        // 🚀 CLICKABLE SEARCH FIELD
+        child: GestureDetector(
+          onTap: onSearchTap,
+          child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200)
+              ),
+              child: Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    const Icon(Icons.search, color: Colors.grey),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Text("Search for Puja, Pandits...", style: TextStyle(color: Colors.grey, fontSize: 14))),
+                    Container(height: 20, width: 1, color: Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 12)),
+                    const Icon(Icons.mic, color: Colors.deepOrange, size: 22),
+                    const SizedBox(width: 16),
+                  ]
+              )
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => 68.0;
+
+  @override
+  double get minExtent => 68.0;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) => true;
 }

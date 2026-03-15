@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 // 🔥 TODO: Apne files ka exact path yahan verify kar lena
 import '../../Pages/Login_Page/login_screen.dart';
 import '../../Pages/Home_Page/home_screen.dart';
+import '../Pages/Home_Page/search_screen.dart';
 import '../Pages/Puja_Page/hawan_puja_screen.dart';
 import '../Pages/Puja_Page/puja_detail_screen.dart';
 import '../Pages/Puja_Page/puja_model.dart';
@@ -127,6 +128,21 @@ class AppRouter {
             PujaDetailScreen(puja: puja), // Naya Page
           );
         },
+      ),
+
+      // Top pe import kar lena: import '../../Pages/Search_Page/search_screen.dart';
+
+      GoRoute(
+        path: '/search',
+        name: 'search',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const SearchScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // 🚀 Search page hamesha fade-in hoke khulta hai professional apps mein
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       ),
     ],
   );
