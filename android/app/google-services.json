@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "947019249098",
+    "project_id": "shubhnowapp",
+    "storage_bucket": "shubhnowapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:947019249098:android:939d4322ad401b1f360b33",
+        "android_client_info": {
+          "package_name": "com.subhnow.panditji.subhnow_panditji"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbEmpOLVoMduu5iCUxvhOZxxHr94X_kDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:947019249098:android:f7a00599116dfd5d360b33",
+        "android_client_info": {
+          "package_name": "com.subhnow.user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbEmpOLVoMduu5iCUxvhOZxxHr94X_kDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
