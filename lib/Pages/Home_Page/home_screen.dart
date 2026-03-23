@@ -8,9 +8,13 @@ import 'package:shimmer/shimmer.dart';
 
 // 🔥 API & Provider Imports (Ensure these paths are correct in your project)
 import '../Login_Page/auth_provider.dart';
+import '../Notification_page/notification_provider.dart';
 import '../Profile_Page/profile_provider.dart';
 import '../Puja_Page/puja_model.dart';
 import '../Puja_Page/puja_provider.dart';
+
+// 🚀 NAYA IMPORT: Notification Provider zaroor import karna
+// Make sure tune is file mein `notificationControllerProvider` define kiya hua hai
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -31,7 +35,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.92);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initLocationSequence());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initLocationSequence();
+
+      // 🚀 NAYA CODE: App open hote hi Push Notification & Token sync chalu karo
+      // Taaki backend ko FCM token mil jaye aur live ghanti bajne lage
+      ref.read(notificationControllerProvider).initializeAppNotifications();    });
 
     _timer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
       if (_currentPage < 2) _currentPage++; else _currentPage = 0;
@@ -456,51 +466,77 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   // --- REUSABLE HEADER & UTILS ---
 
-  Widget _buildHeader(String name) => SliverToBoxAdapter(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: _isLocationLoading ? null : _initLocationSequence,
-                    child: Row(
-                        children: [
-                          const Icon(Icons.location_on, color: Colors.deepOrange, size: 20),
-                          const SizedBox(width: 4),
-                          Flexible(child: Text(_currentLocationName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                          const SizedBox(width: 4),
-                          if (_isLocationLoading) const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepOrange))
-                          else const Icon(Icons.keyboard_arrow_down, color: Colors.grey, size: 18),
-                        ]
+  Widget _buildHeader(String name) {
+    // 🚀 NAYA CODE: Notification state ko read/watch karo
+    // (Taki jab message aaye to UI automatically bindu dikhaye)
+    final notifState = ref.watch(notificationControllerProvider);
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: _isLocationLoading ? null : _initLocationSequence,
+                      child: Row(
+                          children: [
+                            const Icon(Icons.location_on, color: Colors.deepOrange, size: 20),
+                            const SizedBox(width: 4),
+                            Flexible(child: Text(_currentLocationName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                            const SizedBox(width: 4),
+                            if (_isLocationLoading) const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepOrange))
+                            else const Icon(Icons.keyboard_arrow_down, color: Colors.grey, size: 18),
+                          ]
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text("Welcome back, $name", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                ]
-            ),
-          ),
-          Stack(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
-                child: const Icon(Icons.notifications_outlined, color: Colors.black87, size: 24),
+                    const SizedBox(height: 2),
+                    Text("Welcome back, $name", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  ]
               ),
-              Positioned(
-                top: 8, right: 8,
-                child: Container(height: 8, width: 8, decoration: const BoxDecoration(color: Colors.deepOrange, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5)))),
-              )
-            ],
-          ),
-        ],
+            ),
+
+            // 🚀 NAYA CODE: Bell icon ab dynamic aur clickable hai
+            GestureDetector(
+              onTap: () {
+                // GoRouter se notification screen open hogi
+                context.pushNamed('notifications');
+              },
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                    child: const Icon(Icons.notifications_outlined, color: Colors.black87, size: 24),
+                  ),
+
+                  // Agar nayi unread notification hai, toh Red Dot dikhao
+                  if (notifState.unreadCount > 0)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        height: 10,
+                        width: 10,
+                        decoration: const BoxDecoration(
+                            color: Colors.deepOrange,
+                            shape: BoxShape.circle,
+                            border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))
+                        ),
+                      ),
+                    )
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _buildBanner() => SliverToBoxAdapter(
     child: Padding(

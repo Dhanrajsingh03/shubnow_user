@@ -19,7 +19,8 @@ import '../../Pages/Profile_Page/profile_model.dart';
 import '../../Pages/Profile_Page/personal_info_screen.dart';
 import '../../Pages/Profile_Page/manage_address_screen.dart';
 
-// 🚀 NAYI PUJA SCREEN KI IMPORT (Apna sahi path daal lena)
+// 🔔 NOTIFICATION SCREEN KI IMPORT (Apna exact path yahan daal lena)
+import '../../Pages/Notification_Page/notification_screen.dart'; // <--- YAHAN PATH CHECK KARNA
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -116,6 +117,7 @@ class AppRouter {
           const HawanPujaScreen(),
         ),
       ),
+
       GoRoute(
         path: '/puja-details',
         name: 'puja-details',
@@ -125,12 +127,21 @@ class AppRouter {
           return _buildPremiumTransition(
             context,
             state,
-            PujaDetailScreen(puja: puja), // Naya Page
+            PujaDetailScreen(puja: puja),
           );
         },
       ),
 
-      // Top pe import kar lena: import '../../Pages/Search_Page/search_screen.dart';
+      // 🔔 4. NOTIFICATION ROUTE (Ye miss tha bhai!)
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        pageBuilder: (context, state) => _buildPremiumTransition(
+          context,
+          state,
+          const NotificationScreen(), // 👈 Yahan Notification Screen call ho rahi hai
+        ),
+      ),
 
       GoRoute(
         path: '/search',
