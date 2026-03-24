@@ -36,7 +36,7 @@ dependencies:
   change_app_package_name: ^1.5.0
   firebase_core: ^2.0.0
   firebase_messaging: ^14.0.0
-
+  flutter_local_notifications: ^17.2.0  # 🚀 Use this exact version
 dev_dependencies:
   flutter_test:
     sdk: flutter
