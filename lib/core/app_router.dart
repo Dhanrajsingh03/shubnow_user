@@ -1,68 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-// 🔥 TODO: Apne files ka exact path yahan verify kar lena
+// --- 🏠 HOME & LOGIN IMPORTS ---
 import '../../Pages/Login_Page/login_screen.dart';
 import '../../Pages/Home_Page/home_screen.dart';
+import '../Pages/Booking_Page/my_bookings_screen.dart';
 import '../Pages/Home_Page/search_screen.dart';
+
+// --- 🕉️ PUJA PAGES IMPORTS ---
 import '../Pages/Puja_Page/hawan_puja_screen.dart';
 import '../Pages/Puja_Page/puja_detail_screen.dart';
 import '../Pages/Puja_Page/puja_model.dart';
 import '../Pages/Puja_Page/regular_puja_screen.dart';
 import '../Pages/Puja_Page/wedding_puja_screen.dart';
+
+// --- 🌊 SPLASH & ONBOARDING ---
 import '../splash/onboarding_screen.dart';
 import '../splash/splash_screen.dart';
-import '../../Pages/Profile_Page/profile_screen.dart';
 
-// 🚀 PROFILE PAGES KI IMPORTS
+// --- 👤 PROFILE PAGES IMPORTS ---
+import '../../Pages/Profile_Page/profile_screen.dart';
 import '../../Pages/Profile_Page/profile_model.dart';
 import '../../Pages/Profile_Page/personal_info_screen.dart';
 import '../../Pages/Profile_Page/manage_address_screen.dart';
 
-// 🔔 NOTIFICATION SCREEN KI IMPORT (Apna exact path yahan daal lena)
-import '../../Pages/Notification_Page/notification_screen.dart'; // <--- YAHAN PATH CHECK KARNA
+// --- 🔔 NOTIFICATION IMPORT ---
+import '../../Pages/Notification_Page/notification_screen.dart';
+
+// --- 💳 BOOKING & PAYMENT INTEGRATION IMPORTS (NEW) ---
+import '../../Pages/Booking_Page/booking_summary_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
 
+    // 🛠️ Global Error Handling
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('Error')),
       body: Center(child: Text('Route not found: ${state.uri.toString()}')),
     ),
 
     routes: [
+      // 1. Splash Screen
       GoRoute(
         path: '/splash',
         name: 'splash',
         builder: (context, state) => const SplashScreen(),
       ),
 
+      // 2. Onboarding with Premium Transition
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
         pageBuilder: (context, state) => _buildPremiumTransition(context, state, const OnboardingScreen()),
       ),
 
+      // 3. Login Screen
       GoRoute(
         path: '/login',
         name: 'login',
         pageBuilder: (context, state) => _buildPremiumTransition(context, state, const LoginScreen()),
       ),
 
+      // 4. Home Screen
       GoRoute(
         path: '/home',
         name: 'home',
         pageBuilder: (context, state) => _buildPremiumTransition(context, state, const HomeScreen()),
       ),
 
+      // 5. Profile Main Screen
       GoRoute(
         path: '/profile',
         name: 'profile',
         pageBuilder: (context, state) => _buildPremiumTransition(context, state, const ProfileScreen()),
       ),
 
-      // 👤 1. PERSONAL INFORMATION ROUTE
+      // 6. Personal Information (Expects ProfileModel)
       GoRoute(
         path: '/personal-info',
         name: 'personal-info',
@@ -76,7 +90,7 @@ class AppRouter {
         },
       ),
 
-      // 📍 2. MANAGE ADDRESSES ROUTE
+      // 7. Manage Address
       GoRoute(
         path: '/manage-address',
         name: 'manage-address',
@@ -87,7 +101,7 @@ class AppRouter {
         ),
       ),
 
-      // 🪔 3. REGULAR PUJAS ROUTE (Naya Integration)
+      // 8. Regular Pujas List
       GoRoute(
         path: '/regular-pujas',
         name: 'regular-pujas',
@@ -98,6 +112,7 @@ class AppRouter {
         ),
       ),
 
+      // 9. Wedding Pujas List
       GoRoute(
         path: '/wedding-pujas',
         name: 'wedding-pujas',
@@ -108,6 +123,7 @@ class AppRouter {
         ),
       ),
 
+      // 10. Hawan Pujas List
       GoRoute(
         path: '/hawan-pujas',
         name: 'hawan-pujas',
@@ -118,11 +134,11 @@ class AppRouter {
         ),
       ),
 
+      // 11. Puja Details (Expects PujaModel)
       GoRoute(
         path: '/puja-details',
         name: 'puja-details',
         pageBuilder: (context, state) {
-          // 🚀 Extra se poora PujaModel nikaal rahe hain
           final puja = state.extra as PujaModel;
           return _buildPremiumTransition(
             context,
@@ -132,17 +148,43 @@ class AppRouter {
         },
       ),
 
-      // 🔔 4. NOTIFICATION ROUTE (Ye miss tha bhai!)
+      // 🚀 12. BOOKING SUMMARY / CHECKOUT (INTEGRATED)
+      GoRoute(
+        path: '/booking-summary',
+        name: 'booking-summary',
+        pageBuilder: (context, state) {
+          final puja = state.extra as PujaModel;
+          return _buildPremiumTransition(
+            context,
+            state,
+            BookingSummaryScreen(puja: puja),
+          );
+        },
+      ),
+
+      // 🎉 13. BOOKING SUCCESS (INTEGRATED)
+
+      GoRoute(
+        path: '/my-bookings',
+        name: 'my-bookings',
+        pageBuilder: (context, state) => _buildPremiumTransition(
+          context,
+          state,
+          const MyBookingsScreen(),
+        ),
+      ),
+      // 🔔 14. Notifications
       GoRoute(
         path: '/notifications',
         name: 'notifications',
         pageBuilder: (context, state) => _buildPremiumTransition(
           context,
           state,
-          const NotificationScreen(), // 👈 Yahan Notification Screen call ho rahi hai
+          const NotificationScreen(),
         ),
       ),
 
+      // 🔍 15. Search (Special Fade Transition)
       GoRoute(
         path: '/search',
         name: 'search',
@@ -150,25 +192,29 @@ class AppRouter {
           key: state.pageKey,
           child: const SearchScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            // 🚀 Search page hamesha fade-in hoke khulta hai professional apps mein
             return FadeTransition(opacity: animation, child: child);
           },
         ),
       ),
+
     ],
   );
 
-  // 🚀 FAST & SNAPPY NATIVE TRANSITION (300ms)
+  // ==========================================
+  // 🚀 PREMIUM NATIVE TRANSITION ENGINE
+  // ==========================================
   static CustomTransitionPage _buildPremiumTransition(BuildContext context, GoRouterState state, Widget child) {
     return CustomTransitionPage(
       key: state.pageKey,
       child: child,
       transitionDuration: const Duration(milliseconds: 300),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        // Smooth Fade
         final fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(parent: animation, curve: Curves.easeOut),
         );
 
+        // Snappy Slide from Right (5%)
         final slideAnimation = Tween<Offset>(begin: const Offset(0.05, 0.0), end: Offset.zero).animate(
           CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
         );

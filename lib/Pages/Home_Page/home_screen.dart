@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
@@ -586,7 +587,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   );
 
   Widget _buildBottomNav() => Container(
-    decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, -4))]),
+    decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, -4))]
+    ),
     child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -596,7 +600,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 final isSelected = _currentIndex == index;
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => index == 3 ? context.push('/profile') : setState(() => _currentIndex = index),
+                  onTap: () {
+                    // 🚀 NAYA LOGIC: Bookings aur Profile par redirect karo
+                    if (index == 1) {
+                      // Haptic Feedback for premium feel
+                      HapticFeedback.lightImpact();
+                      context.pushNamed('my-bookings'); // 👈 Bookings Router integrate kiya
+                    } else if (index == 3) {
+                      HapticFeedback.lightImpact();
+                      context.pushNamed('profile');
+                    } else {
+                      setState(() => _currentIndex = index);
+                    }
+                  },
                   child: SizedBox(
                     width: MediaQuery.of(context).size.width / 4 - 8,
                     child: Column(
