@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
-import '../../core/dio_client.dart'; // Tera secure Dio setup (Interceptors ke sath)
+import '../../core/dio_client.dart'; // Tera secure Dio setup
 import 'booking_model.dart';
 
 class BookingService {
   // 🚀 Base route for all User Booking APIs
-  // Ensure your DioClient base URL is correct (e.g., http://your-ip:5000/api/v1)
+  // Ensure your DioClient base URL is correct (e.g., http://your-ip:5000/api/v1/bookings)
   final String _baseRoute = '/bookings/user';
 
   // ==========================================
@@ -17,20 +17,26 @@ class BookingService {
         data: bookingPayload,
       );
 
-      // Added 200 check as well just in case backend sends 200 instead of 201
+      // Backend sends an ApiResponse wrapper with 'success' and 'data'
       if (response.statusCode == 201 || response.statusCode == 200) {
-        // Automatically parse the nested Razorpay and Booking data
-        return BookingInitResponse.fromJson(response.data);
+        final responseData = response.data;
+
+        if (responseData['success'] == true) {
+          // BookingInitResponse.fromJson will automatically handle data.booking & data.razorpayOrder
+          return BookingInitResponse.fromJson(responseData);
+        } else {
+          throw Exception(responseData['message'] ?? "Failed to initialize payment.");
+        }
       } else {
-        throw Exception("Failed to initialize payment. Try again.");
+        throw Exception("Server returned ${response.statusCode}. Please try again.");
       }
     } on DioException catch (e) {
       print("❌ Init Payment Error: ${e.message}");
-      // Extract exact error message from Node.js backend
+      // Extract exact error message from Node.js ApiError response
       throw Exception(e.response?.data['message'] ?? "Something went wrong while initiating booking.");
     } catch (e) {
       print("❌ Unknown Error: $e");
-      throw Exception("An unexpected error occurred.");
+      throw Exception("An unexpected error occurred: $e");
     }
   }
 
@@ -54,12 +60,15 @@ class BookingService {
         },
       );
 
-      // Agar backend ne 200 OK diya, matlab payment verified aur Pandit dhoondhna shuru!
-      if (response.statusCode == 200) {
-        print("✅ Payment Verified by Backend!");
+      // Agar backend ne success: true diya, matlab payment verified aur Pandit dhoondhna shuru!
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print("✅ Payment Verified by Backend! Radar active.");
         return true;
       }
+
+      print("⚠️ Backend Rejected Verification: ${response.data['message']}");
       return false;
+
     } on DioException catch (e) {
       print("❌ Payment Verification Failed: ${e.response?.data['message']}");
       return false; // False return karenge taaki UI 'Failed' screen dikhaye
@@ -70,16 +79,14 @@ class BookingService {
   }
 
   // ==========================================
-  // 📜 3. FETCH USER BOOKINGS (With Smart Parser & Pagination)
+  // 📜 3. FETCH USER BOOKINGS (With Smart Extractors)
   // ==========================================
-  // 🚀 Returned List<dynamic> so it perfectly matches the FutureProvider in the UI
   Future<List<dynamic>> getUserBookings({
     int page = 1,
     int limit = 10,
-    String? status // Optional filter (e.g., 'COMPLETED', 'ACCEPTED')
+    String? status
   }) async {
     try {
-      // Dynamic Query Builder
       final Map<String, dynamic> queryParams = {
         'page': page,
         'limit': limit,
@@ -94,30 +101,19 @@ class BookingService {
         queryParameters: queryParams,
       );
 
-      // 🔍 DEBUG PRINTS (Check your flutter console for this!)
-      print("📦 RAW API RESPONSE STATUS: ${response.statusCode}");
-      print("📦 RAW API RESPONSE DATA: ${response.data}");
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // 🔥 EXACT PATH TO DATA: Tere backend ke hisaab se
+        // response.data['data']['bookings'] mein array hai.
 
-      if (response.statusCode == 200) {
-        // 🧠 THE SMART PARSER
-        // Ye check karega ki Node.js ne kis variable me data bheja hai
-        var rawData = response.data['data'] ?? response.data;
+        final responseData = response.data['data'];
 
-        if (rawData == null) {
-          return []; // Khali list bhej do
-        } else if (rawData is List) {
-          return rawData; // Agar seedha array hai, direct return karo
-        } else if (rawData is Map) {
-          // Pagination Wrapper checks (handles different mongoose pagination formats)
-          if (rawData.containsKey('docs')) return rawData['docs'];
-          if (rawData.containsKey('bookings')) return rawData['bookings'];
-          if (rawData.containsKey('result')) return rawData['result'];
-          if (rawData.containsKey('data')) return rawData['data']; // Nested safety
+        if (responseData != null && responseData['bookings'] is List) {
+          return responseData['bookings'];
         }
 
-        return []; // Fallback agar kuch match na ho
+        return []; // Agar list null ho toh khali return karo
       } else {
-        throw Exception("Failed to load booking history.");
+        throw Exception(response.data['message'] ?? "Failed to load booking history.");
       }
     } on DioException catch (e) {
       print("❌ Fetch Bookings Error: ${e.message}");

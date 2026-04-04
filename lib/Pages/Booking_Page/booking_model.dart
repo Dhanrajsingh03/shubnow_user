@@ -3,7 +3,7 @@
 import 'package:flutter/foundation.dart';
 
 // ==========================================
-// 🚦 1. ENUMS (For Type Safety & Clean Code)
+// 🚦 1. ENUMS (Strict Type Safety)
 // ==========================================
 enum BookingStatus {
   PAYMENT_PENDING,
@@ -24,29 +24,29 @@ enum PaymentStatus {
   UNKNOWN
 }
 
-// Extension to safely parse Enum from Backend String
+// 🧠 Smart Extension to safely parse Enum from Node.js String
 extension BookingStatusExtension on String {
   BookingStatus toBookingStatus() {
     return BookingStatus.values.firstWhere(
-          (e) => e.name == this,
+          (e) => e.name.toUpperCase() == toUpperCase().trim(),
       orElse: () => BookingStatus.UNKNOWN,
     );
   }
 
   PaymentStatus toPaymentStatus() {
     return PaymentStatus.values.firstWhere(
-          (e) => e.name == this,
+          (e) => e.name.toUpperCase() == toUpperCase().trim(),
       orElse: () => PaymentStatus.UNKNOWN,
     );
   }
 }
 
 // ==========================================
-// 📦 2. MAIN BOOKING MODEL (History & Tracking)
+// 📦 2. MAIN BOOKING MODEL (Synced with Mongoose)
 // ==========================================
 class BookingModel {
   final String id; // MongoDB _id
-  final String bookingId; // SN-123456
+  final String bookingId; // e.g., SN-123456
   final String? panditId;
   final String? pujaId;
   final String pujaName;
@@ -58,6 +58,7 @@ class BookingModel {
   final BookingLocation location;
   final BookingPricing pricing;
   final BookingPayment payment;
+  final BookingCancellation? cancellation; // Added for cancellation tracking
 
   final BookingStatus status;
   final bool isRated;
@@ -75,47 +76,36 @@ class BookingModel {
     required this.location,
     required this.pricing,
     required this.payment,
+    this.cancellation,
     required this.status,
     required this.isRated,
     required this.createdAt,
   });
 
-  // 📥 JSON to Dart Object (With strict Null Safety)
+  // 📥 JSON to Dart Object (Smart Population Handling)
   factory BookingModel.fromJson(Map<String, dynamic> json) {
     return BookingModel(
-      id: json['_id'] ?? '',
-      bookingId: json['bookingId'] ?? '',
-      panditId: json['pandit'] is String ? json['pandit'] : json['pandit']?['_id'], // Handles both populated and unpopulated
-      pujaId: json['pujaId'],
-      pujaName: json['pujaName'] ?? 'Unknown Puja',
+      id: json['_id']?.toString() ?? '',
+      bookingId: json['bookingId']?.toString() ?? '',
+
+      // Smart Check: Backend can send either Object (populate) or String ID
+      panditId: json['pandit'] is Map ? json['pandit']['_id'] : json['pandit']?.toString(),
+      pujaId: json['pujaId'] is Map ? json['pujaId']['_id'] : json['pujaId']?.toString(),
+
+      pujaName: json['pujaName']?.toString() ?? 'Unknown Puja',
       samagriIncluded: json['samagriIncluded'] ?? false,
-      scheduledDate: DateTime.parse(json['scheduledDate'] ?? DateTime.now().toIso8601String()),
-      scheduledTime: json['scheduledTime'] ?? '',
+      scheduledDate: DateTime.tryParse(json['scheduledDate'] ?? '') ?? DateTime.now(),
+      scheduledTime: json['scheduledTime']?.toString() ?? '',
+
       location: BookingLocation.fromJson(json['location'] ?? {}),
       pricing: BookingPricing.fromJson(json['pricing'] ?? {}),
       payment: BookingPayment.fromJson(json['payment'] ?? {}),
+      cancellation: json['cancellation'] != null ? BookingCancellation.fromJson(json['cancellation']) : null,
+
       status: (json['status'] as String? ?? '').toBookingStatus(),
       isRated: json['isRated'] ?? false,
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
     );
-  }
-
-  // 📤 Dart Object to JSON (For sending to backend if needed)
-  Map<String, dynamic> toJson() {
-    return {
-      '_id': id,
-      'bookingId': bookingId,
-      'pujaId': pujaId,
-      'pujaName': pujaName,
-      'samagriIncluded': samagriIncluded,
-      'scheduledDate': scheduledDate.toIso8601String(),
-      'scheduledTime': scheduledTime,
-      'location': location.toJson(),
-      'pricing': pricing.toJson(),
-      'payment': payment.toJson(),
-      'status': status.name,
-      'isRated': isRated,
-    };
   }
 }
 
@@ -139,12 +129,12 @@ class BookingLocation {
     List<dynamic> coords = json['coordinates'] ?? [0.0, 0.0];
     return BookingLocation(
       coordinates: [
-        (coords[0] as num).toDouble(), // Longitude
-        (coords[1] as num).toDouble(), // Latitude
+        (coords.isNotEmpty ? coords[0] as num : 0).toDouble(), // Longitude
+        (coords.length > 1 ? coords[1] as num : 0).toDouble(), // Latitude
       ],
-      exactAddress: json['exactAddress'] ?? '',
-      landmark: json['landmark'] ?? '',
-      pincode: json['pincode'] ?? '',
+      exactAddress: json['exactAddress']?.toString() ?? '',
+      landmark: json['landmark']?.toString() ?? '',
+      pincode: json['pincode']?.toString() ?? '',
     );
   }
 
@@ -160,40 +150,40 @@ class BookingLocation {
 }
 
 // ==========================================
-// 💰 4. NESTED MODEL: PRICING
+// 💰 4. NESTED MODEL: PRICING (🔥 FIXED KEYS TO MATCH BACKEND 🔥)
 // ==========================================
 class BookingPricing {
   final double basePrice;
-  final double samagriPrice;
+  final double itemsPrice;   // Was samagriPrice
+  final double platformFee;  // Was tax
   final double discount;
-  final double tax; // Platform Fee
-  final double totalAmount;
+  final double totalPrice;   // Was totalAmount
 
   BookingPricing({
     required this.basePrice,
-    required this.samagriPrice,
+    required this.itemsPrice,
+    required this.platformFee,
     required this.discount,
-    required this.tax,
-    required this.totalAmount,
+    required this.totalPrice,
   });
 
   factory BookingPricing.fromJson(Map<String, dynamic> json) {
     return BookingPricing(
       basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0.0,
-      samagriPrice: (json['samagriPrice'] as num?)?.toDouble() ?? 0.0,
+      itemsPrice: (json['itemsPrice'] as num?)?.toDouble() ?? 0.0,     // Fixed Key
+      platformFee: (json['platformFee'] as num?)?.toDouble() ?? 0.0,   // Fixed Key
       discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
-      tax: (json['tax'] as num?)?.toDouble() ?? 0.0,
-      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      totalPrice: (json['totalPrice'] as num?)?.toDouble() ?? 0.0,     // Fixed Key
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'basePrice': basePrice,
-      'samagriPrice': samagriPrice,
+      'itemsPrice': itemsPrice,
+      'platformFee': platformFee,
       'discount': discount,
-      'tax': tax,
-      'totalAmount': totalAmount,
+      'totalPrice': totalPrice,
     };
   }
 }
@@ -214,9 +204,9 @@ class BookingPayment {
 
   factory BookingPayment.fromJson(Map<String, dynamic> json) {
     return BookingPayment(
-      method: json['method'] ?? 'ONLINE',
+      method: json['method']?.toString() ?? 'ONLINE',
       status: (json['status'] as String? ?? '').toPaymentStatus(),
-      transactionId: json['transactionId'] ?? '',
+      transactionId: json['transactionId']?.toString() ?? '',
     );
   }
 
@@ -230,12 +220,32 @@ class BookingPayment {
 }
 
 // ==========================================
-// 🚀 6. RESPONSE MODEL: RAZORPAY INIT
+// 🚫 6. NESTED MODEL: CANCELLATION
+// ==========================================
+class BookingCancellation {
+  final String? cancelledBy; // "USER", "PANDIT", "ADMIN", or null
+  final String reason;
+
+  BookingCancellation({
+    this.cancelledBy,
+    required this.reason,
+  });
+
+  factory BookingCancellation.fromJson(Map<String, dynamic> json) {
+    return BookingCancellation(
+      cancelledBy: json['cancelledBy']?.toString(),
+      reason: json['reason']?.toString() ?? '',
+    );
+  }
+}
+
+// ==========================================
+// 🚀 7. RESPONSE MODEL: RAZORPAY INIT
 // ==========================================
 class BookingInitResponse {
   final String bookingId;
   final String razorpayOrderId;
-  final int amount; // Razorpay expects amount in paise (int)
+  final int amount;
   final String currency;
 
   BookingInitResponse({
@@ -245,16 +255,16 @@ class BookingInitResponse {
     required this.currency,
   });
 
-  // Backend se jo /init-payment ka response aayega, ye use handle karega
   factory BookingInitResponse.fromJson(Map<String, dynamic> json) {
-    final razorpayOrder = json['data']['razorpayOrder'];
-    final booking = json['data']['booking'];
+    final data = json['data'] ?? {};
+    final razorpayOrder = data['razorpayOrder'] ?? {};
+    final booking = data['booking'] ?? {};
 
     return BookingInitResponse(
-      bookingId: booking['_id'] ?? '',
-      razorpayOrderId: razorpayOrder['id'] ?? '',
-      amount: razorpayOrder['amount'] ?? 0,
-      currency: razorpayOrder['currency'] ?? 'INR',
+      bookingId: booking['_id']?.toString() ?? '',
+      razorpayOrderId: razorpayOrder['id']?.toString() ?? '',
+      amount: (razorpayOrder['amount'] as num?)?.toInt() ?? 0,
+      currency: razorpayOrder['currency']?.toString() ?? 'INR',
     );
   }
 }

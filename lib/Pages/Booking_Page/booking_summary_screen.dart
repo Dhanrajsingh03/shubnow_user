@@ -24,12 +24,10 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
   // 🚀 REAL PAYMENT EXECUTION LOGIC (Zero-Lag)
   // ==========================================
   void _executePayment() async {
-    // Instant haptic feedback on touch release
     HapticFeedback.lightImpact();
 
     final provider = ref.read(bookingControllerProvider.notifier);
 
-    // Ye async call background me chalegi, UI turant morph ho jayega
     bool isSuccess = await provider.startBookingFlow(widget.puja);
 
     if (isSuccess && mounted) {
@@ -101,11 +99,11 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
       },
     );
 
-    // 🚀 REDIRECTION LOGIC UPDATED HERE
+    // 🚀 REDIRECT TO MY BOOKINGS
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
-        Navigator.of(context).pop(); // Popup ko close karo pehle
-        context.goNamed('my-bookings'); // 🚀 Seedha "My Bookings" page par redirect!
+        Navigator.of(context).pop();
+        context.goNamed('my-bookings');
       }
     });
   }
@@ -116,13 +114,21 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
     final providerNotifier = ref.read(bookingControllerProvider.notifier);
     final puja = widget.puja;
 
-    // 🧮 CALCULATIONS FOR SPLIT PAYMENT
+    // ==========================================
+    // 🧮 100% CORRECT INDUSTRY MATH LOGIC
+    // ==========================================
     final double basePrice = puja.price.withoutSamagriTotal;
     final double samagriPrice = puja.price.withSamagriTotal - puja.price.withoutSamagriTotal;
     final double selectedSamagriPrice = providerState.isSamagriIncluded ? samagriPrice : 0;
 
+    // 1. DYNAMIC ADVANCE AMOUNT (Platform Fee)
+    final double payableNow = providerNotifier.getAdvanceAmount(puja);
+
+    // 2. To Pay Pandit Later
     final double payableToPandit = basePrice + selectedSamagriPrice;
-    final double payableNow = providerState.platformFee;
+
+    // 3. Grand Total (Everything Added Up)
+    final double grandTotal = payableToPandit + payableNow;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F8),
@@ -161,7 +167,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.network(puja.image, height: 75, width: 75, fit: BoxFit.cover),
+                    child: Image.network(puja.image, height: 75, width: 75, fit: BoxFit.cover, errorBuilder: (_,__,___)=>Container(color: Colors.orange.shade50, child: const Icon(Icons.temple_hindu, color: Colors.orange))),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -198,7 +204,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                     _buildPackageCard(
                       title: "Premium (Pooja + Samagri)",
                       subtitle: "Pandit ji brings all fresh samagri & flowers.",
-                      price: puja.price.withSamagriTotal,
+                      price: puja.price.withSamagriTotal + payableNow,
                       isSelected: providerState.isSamagriIncluded,
                       isRecommended: true,
                       onTap: () {
@@ -213,7 +219,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                     _buildPackageCard(
                       title: "Basic (Pandit Only)",
                       subtitle: "You will arrange all the required puja samagri.",
-                      price: puja.price.withoutSamagriTotal,
+                      price: puja.price.withoutSamagriTotal + payableNow,
                       isSelected: !providerState.isSamagriIncluded,
                       isRecommended: false,
                       onTap: () {
@@ -316,53 +322,107 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 📜 4. TRANSPARENT INVOICE / SPLIT BILL DETAILS
+            // =========================================================
+            // 📜 4. THE ULTIMATE TRANSPARENT INVOICE (Urban Company Style)
+            // =========================================================
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))]
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Payment Summary", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.3)),
+                  const Text("Bill Details", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.3)),
                   const SizedBox(height: 20),
 
-                  _buildDetailedBillRow("Puja Ritual Fee", "To be paid to Pandit", basePrice),
+                  _buildDetailedBillRow("Puja Service Fee", basePrice),
 
                   if (providerState.isSamagriIncluded) ...[
                     const SizedBox(height: 12),
-                    _buildDetailedBillRow("Puja Samagri Kit", "To be paid to Pandit", selectedSamagriPrice),
+                    _buildDetailedBillRow("Puja Samagri Kit", selectedSamagriPrice),
                   ],
 
+                  const SizedBox(height: 12),
+                  _buildDetailedBillRow("Platform & Security Fee", payableNow),
+
+                  // ✂️ Dotted Divider line (Like a real receipt)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Divider(color: Colors.grey.shade300, thickness: 1, height: 1),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Flex(
+                          direction: Axis.horizontal,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: List.generate(
+                            (constraints.constrainWidth() / 8).floor(),
+                                (index) => SizedBox(width: 4, height: 1.5, child: DecoratedBox(decoration: BoxDecoration(color: Colors.grey.shade300))),
+                          ),
+                        );
+                      },
+                    ),
                   ),
 
+                  // 💰 Grand Total
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Total Service Value", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.black87)),
-                      Text("₹${payableToPandit.toInt()}", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.black87)),
+                      const Text("Grand Total", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black87)),
+                      Text("₹${grandTotal.toInt()}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87)),
                     ],
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
+                  // ✅ Box 1: To Pay Now (Advance)
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.deepOrange.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.deepOrange.withOpacity(0.2))),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.green.shade200)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.verified_user_rounded, color: Colors.green.shade600, size: 20),
+                            const SizedBox(width: 8),
+                            const Text("Paying Now (Advance)", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.green)),
+                          ],
+                        ),
+                        Text("₹${payableNow.toInt()}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green.shade700)),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ⏳ Box 2: Pay Later to Pandit
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(color: Colors.deepOrange.shade50, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.deepOrange.shade100)),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text("Booking Amount", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.deepOrange)),
-                            Text("Platform & Security Fee", style: TextStyle(fontSize: 11, color: Colors.deepOrange.shade300, fontWeight: FontWeight.w600)),
+                            Row(
+                              children: [
+                                Icon(Icons.handshake_rounded, color: Colors.deepOrange.shade600, size: 20),
+                                const SizedBox(width: 8),
+                                const Text("Pay to Pandit Later", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.deepOrange)),
+                              ],
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28, top: 2),
+                              child: Text("Cash/UPI after the Puja", style: TextStyle(fontSize: 11, color: Colors.deepOrange.shade300, fontWeight: FontWeight.w700)),
+                            ),
                           ],
                         ),
-                        Text("₹${payableNow.toInt()}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.deepOrange)),
+                        Text("₹${payableToPandit.toInt()}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.deepOrange.shade700)),
                       ],
                     ),
                   ),
@@ -402,10 +462,10 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("BOOKING AMOUNT", style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                        const Text("ADVANCE TO PAY", style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                         Text("₹${payableNow.toInt()}", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.black87, height: 1.1)),
                         const SizedBox(height: 2),
-                        Text("Pay ₹${payableToPandit.toInt()} to Pandit later", style: const TextStyle(fontSize: 10, color: Colors.deepOrange, fontWeight: FontWeight.w800)),
+                        Text("Pay ₹${payableToPandit.toInt()} later", style: const TextStyle(fontSize: 10, color: Colors.deepOrange, fontWeight: FontWeight.w800)),
                       ],
                     ),
                   ),
@@ -528,21 +588,17 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
     );
   }
 
-  Widget _buildDetailedBillRow(String title, String subtitle, double amount) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(subtitle, style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w600)),
-          ],
-        ),
-        Text("₹${amount.toInt()}", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.black87)),
-      ],
+  // 🔥 CLEANER BILL ROW HELPER (Urban Company Style)
+  Widget _buildDetailedBillRow(String title, double amount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: TextStyle(color: Colors.grey.shade700, fontSize: 14, fontWeight: FontWeight.w600)),
+          Text("₹${amount.toInt()}", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.black87)),
+        ],
+      ),
     );
   }
 }

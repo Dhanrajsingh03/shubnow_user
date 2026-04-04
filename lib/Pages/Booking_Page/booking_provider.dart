@@ -22,9 +22,6 @@ class BookingProvider extends ChangeNotifier {
   bool isProcessing = false;
   String? errorMessage;
 
-  // 💰 Platform Settings
-  final double platformFee = 51.0;
-
   Completer<bool>? _paymentCompleter;
   String? _currentBookingId;
 
@@ -49,7 +46,28 @@ class BookingProvider extends ChangeNotifier {
   }
 
   // ==========================================
-  // 📍 REAL-TIME LOCATION ENGINE (Zero-Lag Optimized)
+  // 🧮 DYNAMIC PRICING ENGINE (Industry Standard)
+  // ==========================================
+
+  // 🚀 DYNAMIC ADVANCE FETCH: Fetch exact platform fee directly from PujaModel
+  double getAdvanceAmount(PujaModel puja) {
+    // 🔥 FIX: Replaced hardcoded 101.0 with the actual platform fee from the PujaModel.
+    // Ensure that your PujaModel has a property named `platformFee`.
+    return puja.price.platformFee.toDouble();  }
+
+  double _getSamagriPrice(PujaModel puja) {
+    return puja.price.withSamagriTotal - puja.price.withoutSamagriTotal;
+  }
+
+  double calculateTotal(PujaModel puja) {
+    double base = puja.price.withoutSamagriTotal;
+    double samagri = isSamagriIncluded ? _getSamagriPrice(puja) : 0;
+    double dynamicAdvance = getAdvanceAmount(puja);
+    return base + samagri + dynamicAdvance;
+  }
+
+  // ==========================================
+  // 📍 REAL-TIME LOCATION ENGINE (Zero-Lag)
   // ==========================================
   Future<Position> _getOptimizedPosition() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -65,13 +83,13 @@ class BookingProvider extends ChangeNotifier {
     }
 
     try {
-      // 🚀 INDUSTRY HACK: Don't wait forever. Timeout after 4 seconds!
+      // 🚀 Don't wait forever. Timeout after 4 seconds!
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 4),
       );
     } on TimeoutException {
-      // If indoors and GPS takes too long, fallback to last known location instantly
+      // Fallback to last known location instantly
       Position? lastKnown = await Geolocator.getLastKnownPosition();
       if (lastKnown != null) return lastKnown;
       throw 'Location signal is too weak. Try moving near a window.';
@@ -86,16 +104,6 @@ class BookingProvider extends ChangeNotifier {
   void setDate(DateTime date) { selectedDate = date; notifyListeners(); }
   void setTime(String time) { selectedTime = time; notifyListeners(); }
   void toggleSamagri(bool val) { isSamagriIncluded = val; notifyListeners(); }
-
-  double _getSamagriPrice(PujaModel puja) {
-    return puja.price.withSamagriTotal - puja.price.withoutSamagriTotal;
-  }
-
-  double calculateTotal(PujaModel puja) {
-    double base = puja.price.withoutSamagriTotal;
-    double samagri = isSamagriIncluded ? _getSamagriPrice(puja) : 0;
-    return base + samagri + platformFee;
-  }
 
   void clearState() {
     selectedTime = null;
@@ -127,7 +135,7 @@ class BookingProvider extends ChangeNotifier {
     _paymentCompleter = Completer<bool>();
 
     try {
-      // 1. 📍 Get Optimized Location (Fast)
+      // 1. 📍 Get Optimized Location
       Position position = await _getOptimizedPosition();
 
       // 2. 🗺️ Decode Coordinates
@@ -144,21 +152,23 @@ class BookingProvider extends ChangeNotifier {
       }
 
       final double samagriPrice = _getSamagriPrice(puja);
+      final double dynamicPlatformFee = getAdvanceAmount(puja); // 🚀 Real Dynamic Fee Fetched
 
-      // 3. 📦 Prepare Real Payload
+      // 3. 📦 Prepare Real Payload (100% Matching Backend Structure)
       final payload = {
         "pujaId": puja.id,
         "pujaName": puja.name,
         "samagriIncluded": isSamagriIncluded,
         "scheduledDate": selectedDate!.toIso8601String(),
         "scheduledTime": selectedTime,
-        "coordinates": [position.longitude, position.latitude], // GeoJSON standard [Long, Lat]
+        "coordinates": [position.longitude, position.latitude],
         "exactAddress": realAddress,
         "landmark": realLandmark,
         "pincode": realPincode,
+        // 🔥 Keys updated to match backend API requirement
         "basePrice": puja.price.withoutSamagriTotal,
-        "samagriPrice": samagriPrice,
-        "platformFee": platformFee
+        "itemsPrice": samagriPrice, // Used 'itemsPrice' instead of 'samagriPrice'
+        "platformFee": dynamicPlatformFee
       };
 
       // 4. Hit Node.js Backend
@@ -167,22 +177,21 @@ class BookingProvider extends ChangeNotifier {
 
       // 5. Open Real Razorpay Checkout
       var options = {
-        'key': 'rzp_test_SXtSXWXASpzI3H', // ⚠️ PROD DEPLOYMENT PE ISKO ENV VARIABLE SE LENA!
-        'amount': initRes.amount, // Ye amount Backend se aata hai (paisa mein multiply hoke)
+        'key': 'rzp_test_SXtSXWXASpzI3H', // ⚠️ Ensure you replace this with your Prod Key
+        'amount': initRes.amount,
         'name': 'ShubhNow Services',
         'description': '${puja.name} Advance Booking',
         'order_id': initRes.razorpayOrderId,
-        'timeout': 180, // 3 Minutes timeout
+        'timeout': 180,
         'prefill': {
-          'contact': '', // To-Do: Inject from AuthProvider
+          'contact': '',
           'email': ''
         },
-        'theme': { 'color': '#FF5722' } // Deep Orange match
+        'theme': { 'color': '#FF5722' }
       };
 
       _razorpay.open(options);
 
-      // Return the future that will be completed by the event listeners below
       return await _paymentCompleter!.future;
 
     } catch (e) {
@@ -223,7 +232,6 @@ class BookingProvider extends ChangeNotifier {
 
   void _handlePaymentError(PaymentFailureResponse response) {
     isProcessing = false;
-    // Standardize the error message if user cancels or network fails
     if (response.code == Razorpay.PAYMENT_CANCELLED) {
       errorMessage = "Payment was cancelled.";
     } else {
@@ -242,5 +250,4 @@ class BookingProvider extends ChangeNotifier {
   }
 }
 
-// 🌐 Provider Instance
 final bookingControllerProvider = ChangeNotifierProvider<BookingProvider>((ref) => BookingProvider());

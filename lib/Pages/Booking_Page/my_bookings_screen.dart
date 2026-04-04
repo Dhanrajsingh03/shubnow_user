@@ -49,12 +49,30 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
     return booking['pujaImage'] ?? booking['image'] ?? "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Puja_thali.jpg/640px-Puja_thali.jpg";
   }
 
-  // 🧠 2. SMART AMOUNT EXTRACTOR
-  double _extractAmount(Map<String, dynamic> booking) {
+  // 🧠 2. SMART AMOUNT EXTRACTOR (Modified to extract individual parts)
+  Map<String, double> _extractPricing(Map<String, dynamic> booking) {
+    double basePrice = 0;
+    double samagriPrice = 0;
+    double platformFee = 0;
+
     if (booking['pricing'] != null && booking['pricing'] is Map) {
-      return double.tryParse(booking['pricing']['totalAmount'].toString()) ?? 0.0;
+      basePrice = double.tryParse(booking['pricing']['basePrice']?.toString() ?? '0') ?? 0.0;
+      samagriPrice = double.tryParse(booking['pricing']['itemsPrice']?.toString() ?? '0') ?? 0.0;
+      platformFee = double.tryParse(booking['pricing']['platformFee']?.toString() ?? '0') ?? 0.0;
+    } else {
+      // Fallback if backend structure differs
+      basePrice = double.tryParse(booking['basePrice']?.toString() ?? '0') ?? 0.0;
+      samagriPrice = double.tryParse(booking['itemsPrice']?.toString() ?? '0') ?? 0.0;
+      platformFee = double.tryParse(booking['platformFee']?.toString() ?? '0') ?? 0.0;
     }
-    return double.tryParse(booking['totalAmount']?.toString() ?? '0.0') ?? 0.0;
+
+    return {
+      'base': basePrice,
+      'samagri': samagriPrice,
+      'advance': platformFee,
+      'totalService': basePrice + samagriPrice,
+      'grandTotal': basePrice + samagriPrice + platformFee,
+    };
   }
 
   String _getDisplayId(Map<String, dynamic> booking) {
@@ -65,29 +83,23 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
   }
 
   // ==========================================
-  // 🧔 100% REAL PANDIT PROFILE BOTTOM SHEET
+  // 🧔 PANDIT PROFILE BOTTOM SHEET (Unchanged, it was perfect)
   // ==========================================
   void _showPanditProfile(BuildContext context, Map<String, dynamic> pandit) {
     HapticFeedback.lightImpact();
 
-    // 🔥 PURE API DATA EXTRACTION (No Fake Data)
     final String name = pandit['fullName'] ?? pandit['name'] ?? "Pandit Ji";
-
-    // Fallback avatar if backend has no image
     final String image = pandit['profileImage'] ?? pandit['avatar'] ?? "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
-
-    // Extracting actual stats from Backend DB
     final String bio = pandit['bio'] ?? "Verified Vedic Scholar and Puja Expert registered with us.";
     final String experience = pandit['experience']?.toString() ?? "--";
     final String rating = pandit['rating']?.toString() ?? "New";
     final String pujasDone = pandit['pujasCompleted']?.toString() ?? "--";
 
-    // Extracting Languages (Handling Array from MongoDB)
     List<String> languages = [];
     if (pandit['languages'] is List) {
       languages = (pandit['languages'] as List).map((e) => e.toString()).toList();
     }
-    if (languages.isEmpty) languages = ["Hindi", "Sanskrit"]; // Base fallback
+    if (languages.isEmpty) languages = ["Hindi", "Sanskrit"];
 
     showModalBottomSheet(
       context: context,
@@ -112,7 +124,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
-                      // Avatar & Verification
                       Stack(
                         alignment: Alignment.bottomRight,
                         children: [
@@ -135,7 +146,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
 
                       const SizedBox(height: 32),
 
-                      // Real API Stats Row
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 20),
                         decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.grey.shade200)),
@@ -152,13 +162,11 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                       ),
                       const SizedBox(height: 32),
 
-                      // Real Bio Section
                       const Align(alignment: Alignment.centerLeft, child: Text("About Pandit Ji", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
                       const SizedBox(height: 12),
                       Text(bio, style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.6, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 24),
 
-                      // Real Languages Section
                       const Align(alignment: Alignment.centerLeft, child: Text("Languages", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
                       const SizedBox(height: 12),
                       Align(
@@ -172,7 +180,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
 
                       const SizedBox(height: 40),
 
-                      // Bottom Sticky Actions
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -182,7 +189,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             elevation: 0,
                           ),
-                          onPressed: () { HapticFeedback.mediumImpact(); }, // Implement Call Logic
+                          onPressed: () { HapticFeedback.mediumImpact(); },
                           icon: const Icon(Icons.call_rounded, color: Colors.white),
                           label: const Text("Call Pandit Ji", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
@@ -233,6 +240,9 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
     final pandit = booking['pandit'] is Map ? booking['pandit'] : null;
     final displayId = _getDisplayId(booking);
 
+    // 🧮 Extract pricing map
+    final pricing = _extractPricing(booking);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -257,6 +267,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,6 +285,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                       ),
                       const SizedBox(height: 30),
 
+                      // Service Details Card
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))]),
@@ -310,6 +322,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                       ),
                       const SizedBox(height: 24),
 
+                      // Location
                       const Text("Puja Location", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87)),
                       const SizedBox(height: 12),
                       Row(
@@ -325,12 +338,12 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                       ),
                       const SizedBox(height: 24),
 
-                      // 🚀 THE INTERACTIVE PANDIT CARD (REAL DATA)
+                      // Pandit Card
                       if (pandit != null) ...[
                         const Text("Assigned Pandit", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87)),
                         const SizedBox(height: 12),
                         GestureDetector(
-                          onTap: () => _showPanditProfile(context, pandit), // 🔥 CLICK TRIGGER
+                          onTap: () => _showPanditProfile(context, pandit),
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
@@ -356,28 +369,109 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                         const SizedBox(height: 24),
                       ],
 
-                      // Payment Receipt
+                      // =========================================================
+                      // 📜 THE ULTIMATE TRANSPARENT INVOICE
+                      // =========================================================
                       Container(
                         padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.grey.shade200)),
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.grey.shade200),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))]
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text("Payment Receipt", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black87)),
-                            const SizedBox(height: 16),
-                            _buildPriceItem("Puja Fee", "₹${booking['pricing']?['basePrice'] ?? 0}"),
-                            _buildPriceItem("Samagri Cost", "₹${booking['pricing']?['samagriPrice'] ?? 0}"),
-                            _buildPriceItem("Online Booking Advance", "-₹${booking['pricing']?['tax'] ?? 0}", isDiscount: true),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Text("--------------------------------------------------", maxLines: 1, style: TextStyle(color: Colors.grey, letterSpacing: 2)),
+                            const Text("Payment Receipt", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87, letterSpacing: -0.3)),
+                            const SizedBox(height: 20),
+
+                            _buildDetailedBillRow("Puja Ritual Fee", pricing['base']!),
+
+                            if (pricing['samagri']! > 0) ...[
+                              const SizedBox(height: 12),
+                              _buildDetailedBillRow("Puja Samagri Kit", pricing['samagri']!),
+                            ],
+
+                            const SizedBox(height: 12),
+                            _buildDetailedBillRow("Platform & Security Fee", pricing['advance']!),
+
+                            // ✂️ Dotted Divider line
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Flex(
+                                    direction: Axis.horizontal,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: List.generate(
+                                      (constraints.constrainWidth() / 8).floor(),
+                                          (index) => SizedBox(width: 4, height: 1.5, child: DecoratedBox(decoration: BoxDecoration(color: Colors.grey.shade300))),
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
+
+                            // 💰 Grand Total
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text("Pay to Pandit", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black87)),
-                                Text("₹${_extractAmount(booking).toInt()}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.deepOrange)),
+                                const Text("Grand Total", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black87)),
+                                Text("₹${pricing['grandTotal']!.toInt()}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87)),
                               ],
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // ✅ Box 1: Paid Online (Advance)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.green.shade200)),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 20),
+                                      const SizedBox(width: 8),
+                                      const Text("Paid Online (Advance)", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.green)),
+                                    ],
+                                  ),
+                                  Text("₹${pricing['advance']!.toInt()}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.green.shade700)),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ⏳ Box 2: Pay to Pandit
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(color: status == 'COMPLETED' ? Colors.green.shade50 : Colors.deepOrange.shade50, borderRadius: BorderRadius.circular(16), border: Border.all(color: status == 'COMPLETED' ? Colors.green.shade100 : Colors.deepOrange.shade100)),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(status == 'COMPLETED' ? Icons.check_circle_rounded : Icons.handshake_rounded, color: status == 'COMPLETED' ? Colors.green.shade600 : Colors.deepOrange.shade600, size: 20),
+                                          const SizedBox(width: 8),
+                                          Text(status == 'COMPLETED' ? "Paid to Pandit" : "Pay to Pandit", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: status == 'COMPLETED' ? Colors.green.shade700 : Colors.deepOrange)),
+                                        ],
+                                      ),
+                                      if (status != 'COMPLETED')
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 28, top: 2),
+                                          child: Text("Cash/UPI after the Puja", style: TextStyle(fontSize: 11, color: Colors.deepOrange.shade300, fontWeight: FontWeight.w700)),
+                                        ),
+                                    ],
+                                  ),
+                                  Text("₹${pricing['totalService']!.toInt()}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: status == 'COMPLETED' ? Colors.green.shade700 : Colors.deepOrange.shade700)),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -395,7 +489,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
   }
 
   // ==========================================
-  // 📱 MAIN SCREEN UI (UNCHANGED)
+  // 📱 MAIN SCREEN UI
   // ==========================================
   @override
   Widget build(BuildContext context) {
@@ -449,9 +543,11 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
   Widget _buildBookingCard(Map<String, dynamic> booking, bool isUpcoming) {
     final status = (booking['status'] ?? "PENDING").toString().toUpperCase();
     final String image = _extractImage(booking);
-    final double amount = _extractAmount(booking);
     final displayId = _getDisplayId(booking);
     final Map<String, dynamic>? pandit = booking['pandit'] is Map ? booking['pandit'] : null;
+
+    // Using the new helper to get exact amount Pandit will receive
+    final pricing = _extractPricing(booking);
 
     DateTime date = DateTime.tryParse(booking['scheduledDate'] ?? "") ?? DateTime.now();
     String formattedDate = DateFormat('dd MMM, yyyy').format(date);
@@ -536,8 +632,8 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Payable Amount", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text("₹${amount.toInt()}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black)),
+                  Text(status == 'COMPLETED' ? "Paid Amount" : "Payable Amount", style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text("₹${pricing['totalService']!.toInt()}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black)),
                 ],
               ),
               ElevatedButton(
@@ -559,6 +655,19 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
 
   // --- STYLISH HELPERS ---
 
+  Widget _buildDetailedBillRow(String title, double amount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: TextStyle(color: Colors.grey.shade700, fontSize: 14, fontWeight: FontWeight.w600)),
+          Text("₹${amount.toInt()}", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.black87)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusBadge(String status, {bool large = false}) {
     Color color = Colors.blue;
     String label = status;
@@ -573,16 +682,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
       padding: EdgeInsets.symmetric(horizontal: large ? 14 : 10, vertical: large ? 6 : 4),
       decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(large ? 12 : 8)),
       child: Text(label, style: TextStyle(color: color, fontSize: large ? 12 : 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-    );
-  }
-
-  Widget _buildPriceItem(String label, String price, {bool isDiscount = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600, fontSize: 15)),
-        Text(price, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDiscount ? Colors.green : Colors.black87)),
-      ]),
     );
   }
 
