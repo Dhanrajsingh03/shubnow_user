@@ -3,21 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+// 🔥 Sahi paths check kar lena apne project ke hisaab se
 import 'core/app_router.dart';
+import 'Pages/Notification_Page/notification_service.dart';
 
-// 🔥 Background handler
+// ==========================================
+// 🛡️ TOP-LEVEL BACKGROUND HANDLER
+// ==========================================
+// Firebase ko ye function class ke bahar chahiye hota hai.
+// Ye tab chalta hai jab app minimize ho ya kill ho chuki ho.
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("🔔 USER Background: ${message.notification?.title}");
+  print("🔔 USER Background Notification: ${message.notification?.title}");
 }
 
 void main() async {
+  // 1. Flutter Engine ko native calls ke liye ready karna
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔥 Firebase init
+  // 2. Firebase ko initialize karna
   await Firebase.initializeApp();
 
-  // 🔥 Background handler register
+  // 3. Background Message Handler register karna
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   runApp(
@@ -39,22 +47,28 @@ class _ShubhNowAppState extends ConsumerState<ShubhNowApp> {
   @override
   void initState() {
     super.initState();
+    // 🚀 App load hote hi Firebase setup aur routing listeners on ho jayenge
     setupFirebase();
   }
 
-  // 🔥 Firebase setup
+  // 🔥 Firebase setup logic (Siddha NotificationService use kiya hai)
   void setupFirebase() async {
-    // ✅ Permission
-    await FirebaseMessaging.instance.requestPermission();
+    try {
+      // 1. Humari unified service ko call karna (Token generate + Routing listeners)
+      // Ye function wahi hai jo tera Provider call karta hai,
+      // isliye architecture ekdum intact rahega.
+      await NotificationService().generateAndSendFCMToken();
 
-    // ✅ Token generate
-    String? token = await FirebaseMessaging.instance.getToken();
-    print("🔥 USER FCM TOKEN: $token");
+      // 2. Foreground listener (App khuli hai tab notification aaye toh console me dikhe)
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print("🔔 USER Foreground Notification: ${message.notification?.title}");
+        // Future me yahan tu Local Notification popup dikha sakta hai
+      });
 
-    // ✅ Foreground notification listener
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("🔔 USER Foreground: ${message.notification?.title}");
-    });
+      print("✅ Firebase Messaging & Deep-Linking Initialized");
+    } catch (e) {
+      print("❌ Firebase Setup Error: $e");
+    }
   }
 
   @override
@@ -63,14 +77,16 @@ class _ShubhNowAppState extends ConsumerState<ShubhNowApp> {
       title: 'ShubhNow User',
       debugShowCheckedModeBanner: false,
 
+      // 🎨 Industry Standard Material 3 Theme
       theme: ThemeData(
+        useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.deepOrange,
           primary: Colors.deepOrange,
           secondary: Colors.orangeAccent,
         ),
-        useMaterial3: true,
 
+        // Global TextField Style
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -82,17 +98,21 @@ class _ShubhNowAppState extends ConsumerState<ShubhNowApp> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
 
+        // Global Button Style
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.deepOrange,
             foregroundColor: Colors.white,
+            elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
+            textStyle: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
       ),
 
+      // 🚀 Routing via GoRouter (Jisme humne NavigatorKey dali hui hai)
       routerConfig: AppRouter.router,
     );
   }

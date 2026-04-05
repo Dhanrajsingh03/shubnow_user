@@ -167,7 +167,9 @@ class ProfileScreen extends ConsumerWidget {
                   icon: Icons.receipt_long_rounded,
                   title: 'Booking History',
                   subtitle: 'Track past and upcoming poojas',
-                  onTap: () {},
+                  onTap: () {
+                    context.pushNamed('my-bookings');
+                  },
                 ),
                 _buildMenuTile(
                   icon: Icons.card_giftcard_rounded,

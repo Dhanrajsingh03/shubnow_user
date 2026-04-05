@@ -27,11 +27,17 @@ import '../../Pages/Profile_Page/manage_address_screen.dart';
 // --- 🔔 NOTIFICATION IMPORT ---
 import '../../Pages/Notification_Page/notification_screen.dart';
 
-// --- 💳 BOOKING & PAYMENT INTEGRATION IMPORTS (NEW) ---
+// --- 💳 BOOKING & PAYMENT INTEGRATION IMPORTS ---
 import '../../Pages/Booking_Page/booking_summary_screen.dart';
+import '../Pages/Booking_Page/booking_details_screen.dart';
 
 class AppRouter {
+  // 🚀 THE INDUSTRY STANDARD FIX: Global Navigator Key for Push Notifications
+  // Iske bina background notifications pe click karke navigate karna impossible hai.
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: navigatorKey, // 👈 Key assign kardi yahan
     initialLocation: '/splash',
 
     // 🛠️ Global Error Handling
@@ -162,8 +168,7 @@ class AppRouter {
         },
       ),
 
-      // 🎉 13. BOOKING SUCCESS (INTEGRATED)
-
+      // 🎉 13. MY BOOKINGS (History & Upcoming)
       GoRoute(
         path: '/my-bookings',
         name: 'my-bookings',
@@ -173,6 +178,7 @@ class AppRouter {
           const MyBookingsScreen(),
         ),
       ),
+
       // 🔔 14. Notifications
       GoRoute(
         path: '/notifications',
@@ -197,6 +203,19 @@ class AppRouter {
         ),
       ),
 
+      // 🚀 16. BOOKING DETAILS (NEW FULL PAGE INTEGRATION)
+      GoRoute(
+        path: '/booking-details',
+        name: 'booking-details',
+        pageBuilder: (context, state) {
+          final bookingData = state.extra as Map<String, dynamic>;
+          return _buildPremiumTransition(
+            context,
+            state,
+            BookingDetailsScreen(booking: bookingData),
+          );
+        },
+      ),
     ],
   );
 
