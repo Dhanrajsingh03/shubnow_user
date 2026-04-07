@@ -17,42 +17,73 @@ class BookingSummaryScreen extends ConsumerStatefulWidget {
 }
 
 class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
-  // 🌟 Premium Button Scale State
+  // 🌟 Premium Button Scale State for Micro-interactions
   double _buttonScale = 1.0;
 
   // ==========================================
-  // 🚀 REAL PAYMENT EXECUTION LOGIC (Zero-Lag)
+  // 🚀 REAL PAYMENT EXECUTION LOGIC
   // ==========================================
   void _executePayment() async {
+    final providerState = ref.read(bookingControllerProvider);
+
+    // 🛑 INDUSTRY FIX: Strict Validation before Payment
+    if (providerState.selectedDate == null || providerState.selectedTime == null) {
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white),
+              SizedBox(width: 10),
+              Text("Please select Date and Time", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ],
+          ),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return; // Stop execution here
+    }
+
     HapticFeedback.lightImpact();
+    final providerNotifier = ref.read(bookingControllerProvider.notifier);
 
-    final provider = ref.read(bookingControllerProvider.notifier);
-
-    bool isSuccess = await provider.startBookingFlow(widget.puja);
+    // Start backend booking & Razorpay flow
+    bool isSuccess = await providerNotifier.startBookingFlow(widget.puja);
 
     if (isSuccess && mounted) {
       _showPremiumSuccessDialog();
     } else if (mounted) {
       final errorMsg = ref.read(bookingControllerProvider).errorMessage ?? "Payment Failed!";
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMsg), backgroundColor: Colors.red.shade800),
+        SnackBar(
+          content: Text(errorMsg, style: const TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
       );
     }
   }
 
+  // ==========================================
   // 🌟 THE PREMIUM SUCCESS ANIMATION OVERLAY
+  // ==========================================
   void _showPremiumSuccessDialog() {
     HapticFeedback.heavyImpact();
 
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withOpacity(0.6), // Darker for premium feel
       transitionDuration: const Duration(milliseconds: 400),
       pageBuilder: (context, anim1, anim2) => const SizedBox(),
       transitionBuilder: (context, a1, a2, child) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8 * a1.value, sigmaY: 8 * a1.value),
+          filter: ImageFilter.blur(sigmaX: 12 * a1.value, sigmaY: 12 * a1.value),
           child: FadeTransition(
             opacity: a1,
             child: ScaleTransition(
@@ -65,7 +96,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                   decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(28),
-                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 30, offset: Offset(0, 15))]
+                      boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.2), blurRadius: 40, offset: const Offset(0, 15))]
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -78,17 +109,17 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                           return Transform.scale(
                             scale: value,
                             child: const CircleAvatar(
-                              radius: 40,
+                              radius: 45,
                               backgroundColor: Colors.green,
-                              child: Icon(Icons.check_rounded, color: Colors.white, size: 45),
+                              child: Icon(Icons.check_rounded, color: Colors.white, size: 50),
                             ),
                           );
                         },
                       ),
                       const SizedBox(height: 24),
-                      const Text("Payment Successful!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black87)),
+                      const Text("Payment Successful!", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black87)),
                       const SizedBox(height: 8),
-                      Text("Your booking is confirmed.", style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                      Text("Your booking is confirmed.", style: TextStyle(fontSize: 15, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -99,7 +130,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
       },
     );
 
-    // 🚀 REDIRECT TO MY BOOKINGS
+    // 🚀 REDIRECT TO MY BOOKINGS AFTER SUCCESS
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
         Navigator.of(context).pop();
@@ -114,21 +145,29 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
     final providerNotifier = ref.read(bookingControllerProvider.notifier);
     final puja = widget.puja;
 
-    // ==========================================
-    // 🧮 100% CORRECT INDUSTRY MATH LOGIC
-    // ==========================================
-    final double basePrice = puja.price.withoutSamagriTotal;
-    final double samagriPrice = puja.price.withSamagriTotal - puja.price.withoutSamagriTotal;
-    final double selectedSamagriPrice = providerState.isSamagriIncluded ? samagriPrice : 0;
+    // ==============================================================
+    // 🧮 INDUSTRY-LEVEL MATH LOGIC (Synced with your Backend)
+    // ==============================================================
 
-    // 1. DYNAMIC ADVANCE AMOUNT (Platform Fee)
-    final double payableNow = providerNotifier.getAdvanceAmount(puja);
+    // 1. Fetch Advance / Platform Fee (e.g. 510)
+    final double platformFee = providerNotifier.getAdvanceAmount(puja);
 
-    // 2. To Pay Pandit Later
-    final double payableToPandit = basePrice + selectedSamagriPrice;
+    // 2. Extract Pure Pandit Fee
+    // Backend assumes `withoutSamagriTotal` includes platform fee. So we subtract it.
+    double purePanditFee = puja.price.withoutSamagriTotal - platformFee;
+    if (purePanditFee < 0) purePanditFee = puja.price.withoutSamagriTotal;
 
-    // 3. Grand Total (Everything Added Up)
-    final double grandTotal = payableToPandit + payableNow;
+    // 3. Extract Pure Samagri Extra Cost
+    double samagriExtraCost = puja.price.withSamagriTotal - puja.price.withoutSamagriTotal;
+    if (samagriExtraCost < 0) samagriExtraCost = 0.0;
+
+    // 4. Apply Samagri cost only if user selected it
+    final double selectedSamagriPrice = providerState.isSamagriIncluded ? samagriExtraCost : 0.0;
+
+    // 5. Final Distribution for Invoice
+    final double payableNow = platformFee; // What user pays via Razorpay right now
+    final double payableToPandit = purePanditFee + selectedSamagriPrice; // What Pandit gets later
+    final double grandTotal = payableToPandit + payableNow; // The full invoice amount
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F8),
@@ -175,7 +214,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
                           child: const Text("VERIFIED PANDIT", style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                         ),
@@ -191,7 +230,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 🎁 2. PREMIUM PACKAGE SELECTION
+            // 🎁 2. PACKAGE SELECTION
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -204,7 +243,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                     _buildPackageCard(
                       title: "Premium (Pooja + Samagri)",
                       subtitle: "Pandit ji brings all fresh samagri & flowers.",
-                      price: puja.price.withSamagriTotal + payableNow,
+                      price: purePanditFee + samagriExtraCost, // Pure cost shown in UI
                       isSelected: providerState.isSamagriIncluded,
                       isRecommended: true,
                       onTap: () {
@@ -219,7 +258,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                     _buildPackageCard(
                       title: "Basic (Pandit Only)",
                       subtitle: "You will arrange all the required puja samagri.",
-                      price: puja.price.withoutSamagriTotal + payableNow,
+                      price: purePanditFee, // Pure cost shown in UI
                       isSelected: !providerState.isSamagriIncluded,
                       isRecommended: false,
                       onTap: () {
@@ -250,11 +289,11 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       scrollDirection: Axis.horizontal,
-                      itemCount: 10,
+                      itemCount: 14, // Show next 14 days
                       separatorBuilder: (_,__) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         DateTime date = DateTime.now().add(Duration(days: index + 1));
-                        bool isSelected = providerState.selectedDate?.day == date.day;
+                        bool isSelected = providerState.selectedDate?.day == date.day && providerState.selectedDate?.month == date.month;
 
                         return GestureDetector(
                           onTap: () {
@@ -263,12 +302,12 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            width: 68,
+                            width: 70,
                             decoration: BoxDecoration(
                                 color: isSelected ? Colors.deepOrange : Colors.white,
                                 border: Border.all(color: isSelected ? Colors.deepOrange : Colors.grey.shade300, width: isSelected ? 2 : 1),
-                                borderRadius: BorderRadius.circular(18),
-                                boxShadow: isSelected ? [BoxShadow(color: Colors.deepOrange.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))] : []
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: isSelected ? [BoxShadow(color: Colors.deepOrange.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))] : []
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -286,7 +325,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 32),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text("Select Time", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.3)),
@@ -305,13 +344,13 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                             decoration: BoxDecoration(
                                 color: isSelected ? Colors.deepOrange.withOpacity(0.1) : Colors.white,
                                 border: Border.all(color: isSelected ? Colors.deepOrange : Colors.grey.shade300, width: isSelected ? 2 : 1),
-                                borderRadius: BorderRadius.circular(12)
+                                borderRadius: BorderRadius.circular(14)
                             ),
-                            child: Text(time, style: TextStyle(color: isSelected ? Colors.deepOrange : Colors.black87, fontSize: 14, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600)),
+                            child: Text(time, style: TextStyle(color: isSelected ? Colors.deepOrange : Colors.black87, fontSize: 14, fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600)),
                           ),
                         );
                       }).toList(),
@@ -323,7 +362,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
             const SizedBox(height: 24),
 
             // =========================================================
-            // 📜 4. THE ULTIMATE TRANSPARENT INVOICE (Urban Company Style)
+            // 📜 4. TRANSPARENT INVOICE (Zero Double Math)
             // =========================================================
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -340,17 +379,20 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                   const Text("Bill Details", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.3)),
                   const SizedBox(height: 20),
 
-                  _buildDetailedBillRow("Puja Service Fee", basePrice),
+                  // 1. Pure Pandit Fee
+                  _buildDetailedBillRow("Puja Service Fee", purePanditFee),
 
-                  if (providerState.isSamagriIncluded) ...[
+                  // 2. Pure Samagri Extra Cost
+                  if (providerState.isSamagriIncluded && selectedSamagriPrice > 0) ...[
                     const SizedBox(height: 12),
                     _buildDetailedBillRow("Puja Samagri Kit", selectedSamagriPrice),
                   ],
 
+                  // 3. Platform Fee
                   const SizedBox(height: 12),
                   _buildDetailedBillRow("Platform & Security Fee", payableNow),
 
-                  // ✂️ Dotted Divider line (Like a real receipt)
+                  // ✂️ Dotted Divider line
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: LayoutBuilder(
@@ -367,18 +409,18 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                     ),
                   ),
 
-                  // 💰 Grand Total
+                  // 💰 Grand Total (Everything Added)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text("Grand Total", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black87)),
-                      Text("₹${grandTotal.toInt()}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87)),
+                      Text("₹${grandTotal.toInt()}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19, color: Colors.black87)),
                     ],
                   ),
 
                   const SizedBox(height: 24),
 
-                  // ✅ Box 1: To Pay Now (Advance)
+                  // ✅ Box 1: Paying Now (Advance)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.green.shade200)),
@@ -399,7 +441,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
 
                   const SizedBox(height: 12),
 
-                  // ⏳ Box 2: Pay Later to Pandit
+                  // ⏳ Box 2: Paying Later (To Pandit)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(color: Colors.deepOrange.shade50, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.deepOrange.shade100)),
@@ -429,7 +471,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 130),
+            const SizedBox(height: 140), // Padding for the bottom sticky bar
           ],
         ),
       ),
@@ -542,7 +584,7 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18), // Increased padding
         decoration: BoxDecoration(
           color: isSelected ? Colors.deepOrange.withOpacity(0.04) : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -555,10 +597,10 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              height: 22, width: 22,
+              height: 24, width: 24,
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: isSelected ? Colors.deepOrange : Colors.grey.shade400, width: isSelected ? 6 : 2),
+                  border: Border.all(color: isSelected ? Colors.deepOrange : Colors.grey.shade400, width: isSelected ? 7 : 2),
                   color: Colors.white
               ),
             ),
@@ -570,33 +612,32 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
                   if (isRecommended)
                     Container(
                       margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(color: Colors.green.shade600, borderRadius: BorderRadius.circular(4)),
-                      child: const Text("RECOMMENDED", style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      child: const Text("RECOMMENDED", style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                     ),
-                  Text(title, style: TextStyle(fontSize: 15, fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700, color: Colors.black87)),
+                  Text(title, style: TextStyle(fontSize: 16, fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700, color: Colors.black87)),
                   const SizedBox(height: 4),
                   Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            Text("₹${price.toInt()}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isSelected ? Colors.deepOrange : Colors.black87)),
+            Text("₹${price.toInt()}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isSelected ? Colors.deepOrange : Colors.black87)),
           ],
         ),
       ),
     );
   }
 
-  // 🔥 CLEANER BILL ROW HELPER (Urban Company Style)
   Widget _buildDetailedBillRow(String title, double amount) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: TextStyle(color: Colors.grey.shade700, fontSize: 14, fontWeight: FontWeight.w600)),
-          Text("₹${amount.toInt()}", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.black87)),
+          Text("₹${amount.toInt()}", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.black87)),
         ],
       ),
     );

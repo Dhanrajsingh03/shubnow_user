@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 
-// 🔥 Apna backend service import path check kar lena
 import '../Booking_Page/booking_service.dart';
 
 final myBookingsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
@@ -43,28 +42,52 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
   // 🧠 1. BULLETPROOF IMAGE EXTRACTOR
   String _extractImage(Map<String, dynamic> booking) {
     if (booking['pujaId'] is Map) {
-      return booking['pujaId']['image'] ?? booking['pujaId']['pujaImage'] ?? "";
+      return booking['pujaId']['image']?.toString() ?? booking['pujaId']['pujaImage']?.toString() ?? "";
     }
-    return booking['pujaImage'] ?? booking['image'] ?? "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Puja_thali.jpg/640px-Puja_thali.jpg";
+    return booking['pujaImage']?.toString() ?? booking['image']?.toString() ?? "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Puja_thali.jpg/640px-Puja_thali.jpg";
   }
 
-  // 🧠 2. SMART AMOUNT EXTRACTOR (Used for the card preview)
+  // ==========================================
+  // 🧮 2. 100% CORRECT MATH EXTRACTOR (Ultimate Fix)
+  // ==========================================
   Map<String, double> _extractPricing(Map<String, dynamic> booking) {
-    double basePrice = 0, samagriPrice = 0, platformFee = 0;
+    double rawBasePrice = 0;
+    double rawItemsPrice = 0;
+    double platformFee = 0;
+    double totalPrice = 0;
 
+    // Check pricing object safely
     if (booking['pricing'] != null && booking['pricing'] is Map) {
-      basePrice = double.tryParse(booking['pricing']['basePrice']?.toString() ?? '0') ?? 0.0;
-      samagriPrice = double.tryParse(booking['pricing']['itemsPrice']?.toString() ?? '0') ?? 0.0;
+      rawBasePrice = double.tryParse(booking['pricing']['basePrice']?.toString() ?? '0') ?? 0.0;
+      rawItemsPrice = double.tryParse(booking['pricing']['itemsPrice']?.toString() ?? '0') ?? 0.0;
       platformFee = double.tryParse(booking['pricing']['platformFee']?.toString() ?? '0') ?? 0.0;
+      totalPrice = double.tryParse(booking['pricing']['totalPrice']?.toString() ?? '0') ?? 0.0;
     } else {
-      basePrice = double.tryParse(booking['basePrice']?.toString() ?? '0') ?? 0.0;
-      samagriPrice = double.tryParse(booking['itemsPrice']?.toString() ?? '0') ?? 0.0;
+      rawBasePrice = double.tryParse(booking['basePrice']?.toString() ?? '0') ?? 0.0;
+      rawItemsPrice = double.tryParse(booking['itemsPrice']?.toString() ?? '0') ?? 0.0;
       platformFee = double.tryParse(booking['platformFee']?.toString() ?? '0') ?? 0.0;
+      totalPrice = double.tryParse(booking['totalPrice']?.toString() ?? '0') ?? 0.0;
+    }
+
+    // 🔥 THE FIX:
+    // Backend se aane wale basePrice me platform fee pehle se add hoti hai (Grand Total).
+    // Isliye humein platform fee ko minus karna padega taaki exact "Pandit ji ki pure fee" nikal sake.
+
+    // 1. Find Grand Total (Priority to backend's totalPrice, otherwise sum it up)
+    double grandTotal = totalPrice > 0 ? totalPrice : (rawBasePrice + rawItemsPrice);
+
+    // 2. The amount to pay Pandit = Grand Total MINUS the Platform Fee (Advance paid)
+    double payToPandit = grandTotal - platformFee;
+
+    // 3. Safety check (In case backend sends something completely wrong)
+    if (payToPandit < 0) {
+      payToPandit = rawBasePrice + rawItemsPrice;
     }
 
     return {
-      'totalService': basePrice + samagriPrice, // What goes to Pandit
-      'grandTotal': basePrice + samagriPrice + platformFee,
+      'totalService': payToPandit,  // 🔥 Perfect Amount to pay later
+      'platformFee': platformFee,   // Amount paid now
+      'grandTotal': grandTotal,     // Everything
     };
   }
 
@@ -75,9 +98,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
     return booking['_id']?.toString().toUpperCase().substring(0, 8) ?? "N/A";
   }
 
-  // ==========================================
-  // 📱 MAIN SCREEN UI
-  // ==========================================
   @override
   Widget build(BuildContext context) {
     final bookingsAsync = ref.watch(myBookingsProvider);
@@ -85,6 +105,19 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
       backgroundColor: const Color(0xFFF4F6F8),
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0, centerTitle: true,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.grey.shade100,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black87, size: 18),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                context.pop();
+              },
+            ),
+          ),
+        ),
         title: const Text("My Bookings", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: -0.5)),
         bottom: TabBar(
           controller: _tabController, indicatorColor: Colors.deepOrange, labelColor: Colors.deepOrange,
@@ -131,13 +164,13 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
     final displayId = _getDisplayId(booking);
     final Map<String, dynamic>? pandit = booking['pandit'] is Map ? booking['pandit'] : null;
 
+    // 🔥 Using our new Fixed Pricing logic
     final pricing = _extractPricing(booking);
 
     DateTime date = DateTime.tryParse(booking['scheduledDate'] ?? "") ?? DateTime.now();
     String formattedDate = DateFormat('dd MMM, yyyy').format(date);
 
     return GestureDetector(
-      // 🔥 NAVIGATION: Tap on Card -> Go to Details Page
       onTap: () {
         HapticFeedback.lightImpact();
         context.pushNamed('booking-details', extra: booking);
@@ -170,7 +203,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(booking['pujaName'] ?? "Puja", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: -0.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(booking['pujaName']?.toString() ?? "Puja", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: -0.5), maxLines: 1, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 6),
                       Text("$formattedDate • ${booking['scheduledTime'] ?? ''}", style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600)),
                     ],
@@ -204,9 +237,9 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                 decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.orange.shade100)),
                 child: Row(
                   children: [
-                    CircleAvatar(radius: 16, backgroundColor: Colors.white, backgroundImage: NetworkImage(pandit['profileImage'] ?? "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"), onBackgroundImageError: (_,__) => const Icon(Icons.person, size: 18, color: Colors.orange)),
+                    CircleAvatar(radius: 16, backgroundColor: Colors.white, backgroundImage: NetworkImage(pandit['profileImage']?.toString() ?? "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"), onBackgroundImageError: (_,__) => const Icon(Icons.person, size: 18, color: Colors.orange)),
                     const SizedBox(width: 12),
-                    Text(pandit['fullName'] ?? pandit['name'] ?? "Pandit Ji", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.black87)),
+                    Text(pandit['fullName']?.toString() ?? pandit['name']?.toString() ?? "Pandit Ji", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.black87)),
                     const Spacer(),
                     if (['ACCEPTED', 'EN_ROUTE', 'IN_PROGRESS'].contains(status))
                       const Icon(Icons.call, size: 20, color: Colors.green),
@@ -222,7 +255,9 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(status == 'COMPLETED' ? "Paid Amount" : "Payable Amount", style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                    // 🔥 Label Updated for clarity
+                    Text(status == 'COMPLETED' ? "Paid Amount" : "Pay to Pandit", style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                    // 🚀 Perfect Extracted Pricing (No more platform fee)
                     Text("₹${pricing['totalService']!.toInt()}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black)),
                   ],
                 ),
@@ -233,7 +268,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> with Single
                       side: isUpcoming ? BorderSide.none : const BorderSide(color: Colors.grey),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                   ),
-                  // 🔥 NAVIGATION: Tap on Button -> Go to Details Page
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     context.pushNamed('booking-details', extra: booking);
